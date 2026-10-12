@@ -266,9 +266,9 @@ opportunities compare — in plain language, priced with a validated engine.</di
   <div class="cards" style="grid-template-columns:1fr; ">
     <div class="card">
       <div class="cardhead">
-        <div><h3>Implied vs realised volatility</h3>
-        <div class="note">DVOL (Deribit 30-day implied volatility index) against 30-day realised. The gap is the seller's margin.</div></div>
-        <div class="legend"><span><i style="border-color:var(--iv)"></i>Implied (DVOL)</span>
+        <div><h3 id="histTitle">Implied vs realised volatility</h3>
+        <div class="note" id="histNote">DVOL (Deribit 30-day implied volatility index) against 30-day realised. The gap is the seller's margin.</div></div>
+        <div class="legend"><span id="histLegImplied"><i style="border-color:var(--iv)"></i>Implied (DVOL)</span>
           <span><i style="border-color:var(--rv)"></i>Realised 30d</span></div>
       </div>
       <div class="chartbox" id="histChart"></div>
@@ -289,7 +289,7 @@ opportunities compare — in plain language, priced with a validated engine.</di
     <div class="card">
       <div class="cardhead">
         <div><h3>Term structure — premium by horizon</h3>
-        <div class="note">At-the-money implied volatility for each listed expiry, against 30-day realised.</div></div>
+        <div class="note" id="termNote">At-the-money implied volatility for each listed expiry, against 30-day realised.</div></div>
       </div>
       <div class="boardnote" id="boardNote1" hidden></div>
       <div class="chartbox" id="termChart"></div>
@@ -335,6 +335,12 @@ opportunities compare — in plain language, priced with a validated engine.</di
         <div class="chips" id="expiryChips"></div>
         <div class="hint num" id="tenorHint"></div>
       </div>
+      <div class="field" id="winField" hidden>
+        <label>Fair price based on</label>
+        <select id="qWin"></select>
+        <div class="hint">How far back to measure the asset's real movement. The fair premium is what a
+          seller needs to be paid for that much movement.</div>
+      </div>
       <div class="field">
         <label>Premium — as quoted</label>
         <div class="inline">
@@ -361,13 +367,13 @@ opportunities compare — in plain language, priced with a validated engine.</di
       <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); margin-top:14px;">
         <div class="card">
           <div class="cardhead">
-            <div><h3>Where the quote sits on the listed curve</h3>
-            <div class="note">Implied vol by strike at the matched expiry. Band = listed bid–ask.</div></div>
-            <div class="legend"><span><i style="border-color:var(--iv)"></i>Listed mark</span>
+            <div><h3 id="smileTitle">Where the quote sits on the listed curve</h3>
+            <div class="note" id="smileNote">Implied vol by strike at the matched expiry. Band = listed bid–ask.</div></div>
+            <div class="legend" id="smileLegend"><span><i style="border-color:var(--iv)"></i>Listed mark</span>
               <span><span class="sw" style="background:var(--rv)"></span>Your quote</span></div>
           </div>
           <div class="chartbox" id="smileChart"></div>
-          <details class="tbl"><summary>View strike table</summary><div id="smileTbl"></div></details>
+          <details class="tbl" id="smileDetails"><summary>View strike table</summary><div id="smileTbl"></div></details>
         </div>
         <div class="card">
           <div class="cardhead">
@@ -404,8 +410,8 @@ opportunities compare — in plain language, priced with a validated engine.</di
     </div>
     <div class="card">
       <div class="cardhead">
-        <div><h3>Listed baseline — annualised premium a seller earns today</h3>
-        <div class="note">From listed <b>bid</b> quotes (the side we could actually sell at), interpolated
+        <div><h3 id="baseTitle">Listed baseline — annualised premium a seller earns today</h3>
+        <div class="note" id="baseNote">From listed <b>bid</b> quotes (the side we could actually sell at), interpolated
           across the surface. Darker = richer. A provider must beat the matching cell after costs.</div></div>
         <div class="seg" id="baseSeg" style="margin-left:auto;"></div>
       </div>
@@ -460,6 +466,15 @@ opportunities compare — in plain language, priced with a validated engine.</di
     benchmark for what a provider must beat. Rule inherited from the July research: when you must sell,
     use the bid; when you must buy, the ask; never the mark.</p></details>
 
+  <details class="learn"><summary>What if an asset has no listed options, like COW?</summary>
+    <p>Then there is no market price to compare an offer with, so the hub builds a <b>fair price from the
+    asset's own movement</b>. It measures how much COW actually moved over a window you choose (the last
+    7 to 180 days, or the 2-year typical level), and prices the same option at that volatility. That is the
+    premium a seller needs to be paid for the movement COW really has.</p>
+    <p>An offer <b>below fair</b> pays for less movement than COW delivers: the buyer gets the better side.
+    Two honest limits: the past does not guarantee the future, and the fair price uses one volatility for
+    every strike, while puts far below spot normally deserve extra. Treat fair as a floor, not a target.</p></details>
+
   <details class="learn"><summary>When is it simply the wrong time to subscribe?</summary>
     <p>Two red flags. <b>Implied below realised</b> — sellers are being underpaid for actual movement; wait.
     <b>Very low vol percentile</b> — premiums are thin in absolute terms; capping upside for a small premium
@@ -473,7 +488,8 @@ opportunities compare — in plain language, priced with a validated engine.</di
   <div><b>Method.</b> Quotes are converted with Black-76 on the Deribit forward for the matched expiry, r = 0,
   bisection to 10⁻⁶ — the same conventions validated in the July 2026 options research (<code>validate.py</code>
   reproduces the published BTC 36.35% / ETH 53.9% anchors). Fair value is interpolated on the listed surface:
-  linear in strike on the out-of-the-money side, linear in total variance across expiries.</div>
+  linear in strike on the out-of-the-money side, linear in total variance across expiries. Assets with no
+  listed options (COW) are priced at their own realised volatility over the chosen window, same engine.</div>
   <div><b>Sources.</b> Deribit public API (option board, mark IVs, forwards, DVOL) · Binance public API
   (5-minute and daily prices for realised vol). No API keys anywhere.
   Refresh with <code>python refresh.py</code>.</div>
@@ -534,7 +550,10 @@ const fmt = {
   pts: x => (x>=0?'+':'')+x.toFixed(1)+' pts',
   pc:  (x,d=1) => x.toFixed(d)+'%',
   d:   x => x.toLocaleString('en-US',{maximumFractionDigits:0}),
+  // prices: whole dollars for BTC/ETH, four decimals for sub-dollar tokens like COW
+  px:  x => x.toLocaleString('en-US',{maximumFractionDigits: Math.abs(x)>=1000?0:Math.abs(x)>=10?2:4}),
 };
+const roundPx = x => +x.toPrecision(6);
 function M(){ return D.assets[ST.asset]; }
 function rv30(a){ const m=(a||M()).realised['30']; return m?m.vol:null; }
 
@@ -635,6 +654,32 @@ function atmAt(days){
   if(hi.days===lo.days) return lo.atm;
   const T=days/365, T1=lo.days/365, T2=hi.days/365, w=(T-T1)/(T2-T1);
   return Math.sqrt(((1-w)*lo.atm*lo.atm*T1 + w*hi.atm*hi.atm*T2)/T);
+}
+
+/* --------- assets without listed options: fair value from realised volatility --------- */
+function isListed(a){ return (a||M()).listed!==false; }
+const FAIR_WINDOWS=[7,14,30,60,90,180];
+function nearestWindow(days){
+  return FAIR_WINDOWS.reduce((b,w)=>Math.abs(w-days)<Math.abs(b-days)?w:b, FAIR_WINDOWS[0]);
+}
+// win: 'match' (window closest to the option's tenor) | '7'…'180' | 'typical' (2-year median)
+function fairVolFor(win, days){
+  const a=M(), w=(win==='match'||win==='typical')? nearestWindow(days||30) : +win;
+  if(win==='typical'){
+    const i=a.cone.windows.indexOf(w);
+    return i>=0? {vol:a.cone.p50[i], w, key:'typical', label:`2-year typical (${w}d)`,
+                  src:'median of every '+w+'-day stretch over 2 years'} : null;
+  }
+  const m=a.realised[String(w)];
+  if(!m) return null;
+  return {vol:m.vol, w, key:String(w), label:`last ${w} days`,
+          src: m.src==='1d'? 'daily closes' : (m.src==='1h'? 'hourly' : m.src)+' bars'};
+}
+function rvPctAt(dateStr){ // percentile of the 30d realised vol within the prior two years
+  const h=M().rv30_history.filter(p=>p[0]<=dateStr).slice(-730);
+  if(!h.length) return null;
+  const cur=h[h.length-1][1];
+  return 100*h.filter(p=>p[1]<=cur).length/h.length;
 }
 
 /* ================= tooltip ================= */
@@ -757,7 +802,39 @@ function monthTicks(dates, n=5){
   }
   return out;
 }
+function renderKPIsFair(){
+  const a=M(), latest=isLatest(), Dt=effDate();
+  const spot = latest? a.spot : spotAt(Dt);
+  const r30 = latest? rv30(a) : rvWindowAt(30, Dt);
+  const i30 = a.cone.windows.indexOf(30), typical = i30>=0? a.cone.p50[i30] : null;
+  const pct = rvPctAt(Dt);
+  const src = a.realised['30'] && a.realised['30'].src==='1h' ? 'hourly prices' : 'exchange prices';
+  const tiles=[
+    {l:`${ST.asset} spot`, v: spot!=null?'$'+fmt.px(spot):'—', s: latest?'Binance':'daily close, '+fmtDate(Dt)},
+    {l:'Realised vol — 30d', v:r30!=null?fmt.pc(r30):'—',
+      s: latest?`what ${ST.asset} actually moved (${src})`:'30 days ending '+fmtDate(Dt)+' (daily closes)'},
+    {l:'Typical 30d vol — 2 years', v:typical!=null?fmt.pc(typical):'—', s:'median of every 30-day stretch'},
+    {l:'30d vol vs past 2 years', v:pct!=null?Math.round(pct)+'th pctile':'—',
+      s: pct==null?'':(pct<35?'calmer than usual':(pct<65?'normal range':'more volatile than usual')), meter:pct},
+    {l:'Listed options', v:'None', s:'fair value comes from realised vol', cls:'warn'},
+  ];
+  const k=$('kpis'); k.innerHTML='';
+  for(const t of tiles){
+    const d=document.createElement('div'); d.className='kpi';
+    d.innerHTML=`<div class="l">${t.l}</div><div class="v num">${t.v}</div>
+      <div class="s ${t.cls||''}">${t.s}</div>${t.meter!=null?`<div class="meter"><div style="width:${t.meter}%"></div></div>`:''}`;
+    k.appendChild(d);
+  }
+  const asOf = latest? '' : ` — as of ${fmtDate(Dt)}`;
+  $('regime').innerHTML=`<div class="verdict-strip">
+    <b>No listed options market for ${ST.asset}${asOf}.</b> There is no implied volatility to compare against,
+    so a fair price is built from ${ST.asset}'s own movement: ${r30!=null?fmt.pc(r30):'—'} over the last 30 days,
+    against a typical ${typical!=null?fmt.pc(typical):'—'} over two years.
+    In the quote checker, an offer that pays for less movement than ${ST.asset} actually shows over the window you
+    choose is <b>below fair</b>: the buyer is getting the better side of the deal.</div>`;
+}
 function renderKPIs(){
+  if(!isListed()) return renderKPIsFair();
   const a=M(), latest=isLatest(), Dt=effDate();
   const spot = latest? a.spot : spotAt(Dt);
   const r30 = latest? rv30(a) : rvWindowAt(30, Dt);
@@ -807,30 +884,40 @@ function sliceRange(hist){
   return upto.slice(-days);
 }
 function renderHist(){
-  const a=M();
+  const a=M(), listed=isListed(a);
+  $('histTitle').textContent = listed? 'Implied vs realised volatility' : 'Realised volatility over time';
+  $('histNote').textContent = listed
+    ? "DVOL (Deribit 30-day implied volatility index) against 30-day realised. The gap is the seller's margin."
+    : `How much ${ST.asset} actually moved, measured over rolling 30-day windows. No listed options exist, so there is no implied line.`;
+  $('histLegImplied').style.display = listed? '' : 'none';
   const dv=sliceRange(a.dvol.history), rv=sliceRange(a.rv30_history);
   const rvMap=new Map(a.rv30_history.map(p=>[p[0],p[1]]));
   const s1=dv.map(p=>[+dISO(p[0]),p[1]]), s2=rv.map(p=>[+dISO(p[0]),p[1]]);
-  const dates=dv.map(p=>p[0]);
+  const base = s1.length? s1 : s2;                // the series the crosshair snaps to
+  const dates=(dv.length? dv : rv).map(p=>p[0]);
   lineChart('histChart',{H:250,
-    series:[{pts:s1,color:COL.iv,name:'Implied (DVOL)'},{pts:s2,color:COL.rv,name:'Realised 30d'}],
+    series:[...(s1.length?[{pts:s1,color:COL.iv,name:'Implied (DVOL)'}]:[]),{pts:s2,color:COL.rv,name:'Realised 30d'}],
     xTicks:monthTicks(dates,6), yFmt:v=>v+'%',
     tipAt:fx=>{
-      if(!s1.length) return null;
-      let best=s1[0]; for(const p of s1) if(Math.abs(p[0]-fx)<Math.abs(best[0]-fx)) best=p;
+      if(!base.length) return null;
+      let best=base[0]; for(const p of base) if(Math.abs(p[0]-fx)<Math.abs(best[0]-fx)) best=p;
       const iso=new Date(best[0]).toISOString().slice(0,10);
       const rvv=rvMap.get(iso);
+      if(!s1.length) return {x:best[0], html:`<div class="t">${iso}</div>`
+        +tipRow(COL.rv,'Realised 30d',best[1].toFixed(1)+'%')};
       return {x:best[0], html:`<div class="t">${iso}</div>`
         +tipRow(COL.iv,'Implied',best[1].toFixed(1)+'%')
         +(rvv!=null?tipRow(COL.rv,'Realised 30d',rvv.toFixed(1)+'%'):'')
         +`<div class="t" style="margin-top:3px">gap ${rvv!=null?fmt.pts(best[1]-rvv):'—'}</div>`};
     }});
   // table view
-  const rows=dv.filter((_,i)=>i%Math.ceil(dv.length/12)===0||i===dv.length-1).map(p=>{
-    const r=rvMap.get(p[0]);
-    return `<tr><td class="num">${p[0]}</td><td class="r num">${p[1].toFixed(1)}%</td><td class="r num">${r!=null?r.toFixed(1)+'%':'—'}</td></tr>`;
+  const src = dv.length? dv : rv;
+  const dvMap=new Map(a.dvol.history.map(p=>[p[0],p[1]]));
+  const rows=src.filter((_,i)=>i%Math.ceil(src.length/12)===0||i===src.length-1).map(p=>{
+    const r=rvMap.get(p[0]), iv=dvMap.get(p[0]);
+    return `<tr><td class="num">${p[0]}</td>${listed?`<td class="r num">${iv!=null?iv.toFixed(1)+'%':'—'}</td>`:''}<td class="r num">${r!=null?r.toFixed(1)+'%':'—'}</td></tr>`;
   }).join('');
-  $('histTbl').innerHTML=`<table><tr><th>Date</th><th class="r">Implied</th><th class="r">Realised 30d</th></tr>${rows}</table>`;
+  $('histTbl').innerHTML=`<table><tr><th>Date</th>${listed?'<th class="r">Implied</th>':''}<th class="r">Realised 30d</th></tr>${rows}</table>`;
 }
 function renderCone(){
   const a=M(), c=a.cone, latest=isLatest(), Dt=effDate();
@@ -843,7 +930,7 @@ function renderCone(){
   const curLabel = latest? 'Realised today' : 'Realised on '+fmtDate(Dt);
   // the implied overlay comes from the live board and cannot be rewound
   const term = latest? a.expiries.filter(e=>e.atm!=null&&e.days>=6&&e.days<=200).map(e=>[Math.sqrt(e.days),e.atm]) : [];
-  $('coneLegImplied').style.display = latest? '' : 'none';
+  $('coneLegImplied').style.display = (latest && isListed(a))? '' : 'none';
   $('coneLegCur').childNodes[1].textContent = curLabel;
   lineChart('coneChart',{H:250,
     band:[{pts:band1,color:COL.text,opacity:0.07},{pts:band2,color:COL.text,opacity:0.12}],
@@ -867,6 +954,15 @@ function renderCone(){
 }
 function renderTerm(){
   const a=M(), r30=rv30(a);
+  if(!isListed(a)){
+    $('termNote').textContent='At-the-money implied volatility for each listed expiry.';
+    $('termChart').innerHTML=`<div class="empty">No listed ${esc(ST.asset)} options exist on Deribit, Binance,
+      OKX, Bybit or Derive, so there is no market term structure. The quote checker prices ${esc(ST.asset)}
+      offers from realised volatility instead: pick the window in section 2.</div>`;
+    $('termTbl').innerHTML='';
+    return;
+  }
+  $('termNote').textContent='At-the-money implied volatility for each listed expiry, against 30-day realised.';
   const es=a.expiries.filter(e=>e.atm!=null&&e.days>1);
   const pts=es.map(e=>[Math.sqrt(e.days),e.atm]);
   lineChart('termChart',{H:250,
@@ -890,10 +986,12 @@ function renderTerm(){
 }
 
 /* ================= section 2: quote checker ================= */
-const Q = { struct:'cc', strikeMode:'pct', strike:110, expiry:null, prem:2.0, conv:'pct', notional:1000000, provider:null };
+const Q = { struct:'cc', strikeMode:'pct', strike:110, expiry:null, prem:2.0, conv:'pct', notional:1000000, provider:null, win:'match' };
+function snapDatePlus(days){ return shiftDate(new Date(D.generated_ts).toISOString().slice(0,10), days); }
 function qDefaults(){
   const a=M();
   Q.provider = Q.provider || (D.meta.providers[0]||'Provider');
+  if(!isListed(a)){ Q.expiry = snapDatePlus(30); return; }   // no listed expiries: 30 days out
   // default expiry: nearest listed >= 30d
   const e = a.expiries.find(e=>e.days>=30) || a.expiries[a.expiries.length-1];
   Q.expiry = e ? e.date : null;
@@ -933,8 +1031,31 @@ function evalQuote(){
   const pAssign = fairIV!=null? probITM(F,K,T,fairIV/100,kind) : (qiv!=null?probITM(F,K,T,qiv,kind):null);
   const premAtBid = bid? black76(F,K,T,bid.iv/100,kind) : null;
   const flags=[...new Set([...(mark?mark.flags:[]),...(bid?bid.flags:[])])];
-  return {a,K,days,T,F,kind,prem,qiv:qiv!=null?qiv*100:null,mark:fairIV,bid:bid?bid.iv:null,
-    r30:r30v,units,base,annYield,pAssign,premAtBid,flags};
+  const out={a,K,days,T,F,kind,prem,qiv:qiv!=null?qiv*100:null,mark:fairIV,bid:bid?bid.iv:null,
+    r30:r30v,units,base,annYield,pAssign,premAtBid,flags,listed:isListed(a)};
+  if(!out.listed){
+    const fair=fairVolFor(Q.win, days);
+    out.fair=fair;
+    out.fairPrem = fair? black76(F,K,T,fair.vol/100,kind) : null;
+    out.pAssign = fair? probITM(F,K,T,fair.vol/100,kind) : out.pAssign;
+    const m=K/a.spot;
+    if((kind==='put' && m<=0.9+1e-9) || (kind==='call' && m>=1.1-1e-9))
+      flags.push('fair price uses one volatility for every strike; strikes this far from spot normally deserve extra (skew), so treat it as a floor');
+  }
+  return out;
+}
+function verdictFair(r){
+  if(r.qiv==null) return {cls:'na', label:'No verdict', text:'Enter a premium to get a verdict.'};
+  if(!r.fair) return {cls:'na', label:'No verdict', text:'Not enough price history for this window.'};
+  const rich=D.meta.thresholds.fair_rich_pts??10, e=r.qiv-r.fair.vol;
+  const offer=r.prem*r.units, fair=r.fairPrem*r.units;
+  const fairTxt=`${fmt.usd(fair)} (${(r.fairPrem/r.base*100).toFixed(2)}% upfront)`;
+  if(e<0) return {cls:'bad', label:'✕ Below fair price', text:
+    `The offer implies ${r.qiv.toFixed(1)}% volatility, but ${ST.asset} actually moved ${r.fair.vol.toFixed(1)}% over the ${r.fair.label}. The buyer is paying for less movement than ${ST.asset} delivers. Fair premium for this strike and expiry: ${fairTxt}, against ${fmt.usd(offer)} offered. Push back to at least the fair level.`};
+  if(e<rich) return {cls:'warn', label:'~ Fair', text:
+    `The offer pays for ${r.qiv.toFixed(1)}% volatility, ${fmt.pts(e)} above the ${r.fair.vol.toFixed(1)}% ${ST.asset} moved over the ${r.fair.label}. It covers the real movement with a modest cushion: ${fmt.usd(offer)} offered vs ${fairTxt} fair. Acceptable; worth asking for more if the strike is far from spot.`};
+  return {cls:'good', label:'✓ Above fair price', text:
+    `The offer pays for ${r.qiv.toFixed(1)}% volatility, ${fmt.pts(e)} above what ${ST.asset} moved over the ${r.fair.label} (${r.fair.vol.toFixed(1)}%). ${fmt.usd(offer)} offered vs ${fairTxt} fair. A good price for the risk, if counterparty and settlement terms are acceptable.`};
 }
 function verdictOf(r, th){
   if(r.qiv==null) return {cls:'na', label:'No verdict', text:'Enter a premium to get a verdict.'};
@@ -967,8 +1088,26 @@ function renderQuote(){
     usd:'US dollars per unit of '+ST.asset+'.',
     asset:ST.asset+' received per unit — converted at spot.'})[Q.conv];
   if(!r){ box.innerHTML='<div class="empty">Enter a strike, expiry and premium.</div>'; return; }
-  const v=verdictOf(r,th);
+  const v= r.listed? verdictOf(r,th) : verdictFair(r);
   const eBid=r.bid!=null&&r.qiv!=null? r.qiv-r.bid:null, eMark=r.mark!=null&&r.qiv!=null? r.qiv-r.mark:null;
+  const rich=D.meta.thresholds.fair_rich_pts??10;
+  const eFair=(!r.listed && r.fair && r.qiv!=null)? r.qiv-r.fair.vol : null;
+  const benchFacts = r.listed ? `
+      <div class="fact"><div class="l">Listed market — bid / mark</div>
+        <div class="v num">${r.bid!=null?r.bid.toFixed(1):'—'}% / ${r.mark!=null?r.mark.toFixed(1):'—'}%</div>
+        <div class="s">same strike &amp; expiry, Deribit</div></div>
+      <div class="fact"><div class="l">Edge vs listed bid</div>
+        <div class="v num" style="color:${eBid==null?'inherit':eBid>=th.rich?'var(--good)':eBid>=0?'var(--warn)':'var(--bad)'}">${eBid!=null?fmt.pts(eBid):'—'}</div>
+        <div class="s">${eMark!=null?fmt.pts(eMark)+' vs fair value':''}</div></div>` : `
+      <div class="fact"><div class="l">Fair volatility — ${r.fair?esc(r.fair.label):'—'}</div>
+        <div class="v num">${r.fair?r.fair.vol.toFixed(1)+'%':'—'}</div>
+        <div class="s">what ${ST.asset} actually moved (${r.fair?esc(r.fair.src):'—'})</div></div>
+      <div class="fact"><div class="l">Edge vs fair</div>
+        <div class="v num" style="color:${eFair==null?'inherit':eFair>=rich?'var(--good)':eFair>=0?'var(--warn)':'var(--bad)'}">${eFair!=null?fmt.pts(eFair):'—'}</div>
+        <div class="s">offer's implied vol minus fair vol</div></div>`;
+  const premSub = r.listed
+    ? `${fmt.usd(r.prem)} per ${ST.asset} · ${(r.prem/r.base*100).toFixed(2)}% upfront`
+    : `fair: ${r.fairPrem!=null?fmt.usd(r.fairPrem*r.units):'—'} · offer ${(r.prem/r.base*100).toFixed(2)}% upfront`;
   box.innerHTML=`
     <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;">
       <div>
@@ -977,16 +1116,10 @@ function renderQuote(){
       </div>
       <div style="margin-left:auto"><span class="badge ${v.cls}">${v.label}</span></div>
     </div>
-    <div class="facts">
-      <div class="fact"><div class="l">Listed market — bid / mark</div>
-        <div class="v num">${r.bid!=null?r.bid.toFixed(1):'—'}% / ${r.mark!=null?r.mark.toFixed(1):'—'}%</div>
-        <div class="s">same strike &amp; expiry, Deribit</div></div>
-      <div class="fact"><div class="l">Edge vs listed bid</div>
-        <div class="v num" style="color:${eBid==null?'inherit':eBid>=th.rich?'var(--good)':eBid>=0?'var(--warn)':'var(--bad)'}">${eBid!=null?fmt.pts(eBid):'—'}</div>
-        <div class="s">${eMark!=null?fmt.pts(eMark)+' vs fair value':''}</div></div>
-      <div class="fact"><div class="l">Premium</div>
+    <div class="facts">${benchFacts}
+      <div class="fact"><div class="l">Premium offered</div>
         <div class="v num">${fmt.usd(r.prem*r.units)}</div>
-        <div class="s num">${fmt.usd(r.prem)} per ${ST.asset} · ${(r.prem/r.base*100).toFixed(2)}% upfront</div></div>
+        <div class="s num">${premSub}</div></div>
       <div class="fact"><div class="l">Annualised premium yield</div>
         <div class="v num">${r.annYield!=null?r.annYield.toFixed(1)+'%':'—'}</div>
         <div class="s">on the ${Q.struct==='cc'?'asset':'cash'} at risk</div></div>
@@ -994,14 +1127,45 @@ function renderQuote(){
         <div class="v num">${r.pAssign!=null?(r.pAssign*100).toFixed(0)+'%':'—'}</div>
         <div class="s">${Q.struct==='cc'?'probability the '+ST.asset+' is called away':'probability we are assigned the '+ST.asset}</div></div>
       <div class="fact"><div class="l">${Q.struct==='cc'?'Upside kept up to':'Buys '+ST.asset+' at (net)'}</div>
-        <div class="v num">${Q.struct==='cc'? '$'+Math.round(r.K+r.prem).toLocaleString('en-US') : '$'+Math.round(r.K-r.prem).toLocaleString('en-US')}</div>
+        <div class="v num">${Q.struct==='cc'? '$'+fmt.px(r.K+r.prem) : '$'+fmt.px(r.K-r.prem)}</div>
         <div class="s">${Q.struct==='cc'?'strike + premium — beyond this, hold wins':'strike − premium, if assigned'}</div></div>
     </div>
     <div class="explain">${v.text}</div>
     ${r.flags.length?`<div class="flags">⚠ ${r.flags.join(' · ')}</div>`:''}`;
-  renderSmile(r); renderPayoff(r); renderScenarios(r);
+  if(r.listed) renderSmile(r); else renderFairLadder(r);
+  renderPayoff(r); renderScenarios(r);
+}
+function setSmileCard(listed){
+  $('smileTitle').textContent = listed? 'Where the quote sits on the listed curve' : `Fair price from ${ST.asset}'s past volatility`;
+  $('smileNote').textContent = listed? 'Implied vol by strike at the matched expiry. Band = listed bid–ask.'
+    : 'Same strike and expiry, priced at the volatility the asset actually showed over each window. Your selected window is highlighted.';
+  $('smileLegend').style.display = listed? '' : 'none';
+  $('smileDetails').style.display = listed? '' : 'none';
+}
+function renderFairLadder(r){
+  setSmileCard(false);
+  const sel = Q.win==='match'? String(nearestWindow(r.days)) : Q.win;
+  const offer = r.prem!=null? r.prem*r.units : null;
+  const rows=[...FAIR_WINDOWS.map(String),'typical'].map(o=>{
+    const f=fairVolFor(o, r.days); if(!f) return '';
+    const fp=black76(r.F,r.K,r.T,f.vol/100,r.kind), tot=fp*r.units;
+    const diff = offer!=null? offer-tot : null;
+    const on = o===sel;
+    return `<tr style="${on?'background:var(--surface-2);font-weight:600':''}">
+      <td>${on?'▸ ':''}${esc(f.label)}</td>
+      <td class="r num">${f.vol.toFixed(1)}%</td>
+      <td class="r num">${fmt.usd(tot)}</td>
+      <td class="r num">${(fp/r.base*100).toFixed(2)}%</td>
+      <td class="r num" style="color:${diff==null?'inherit':diff>=0?'var(--good)':'var(--bad)'}">${diff==null?'—':(diff>=0?'+':'−')+fmt.usd(Math.abs(diff))}</td></tr>`;
+  }).join('');
+  $('smileChart').innerHTML=`<div style="overflow-x:auto"><table>
+    <tr><th>Volatility measured over</th><th class="r">${esc(ST.asset)} moved</th><th class="r">Fair premium</th>
+      <th class="r">Fair % upfront</th><th class="r">Offer vs fair</th></tr>${rows}</table></div>
+    <div class="note" style="margin-top:8px">Read across: if the offer is below fair for most windows, the buyer
+      is underpaying for ${esc(ST.asset)}'s real movement whichever period you trust.</div>`;
 }
 function renderSmile(r){
+  setSmileCard(true);
   const a=M(), exps=a.expiries.filter(e=>e.days>0.3);
   let e=exps[0]; for(const x of exps) if(Math.abs(x.days-r.days)<Math.abs(e.days-r.days)) e=x;
   const lo=Math.min(r.K*0.82, e.fwd*0.8), hi=Math.max(r.K*1.18, e.fwd*1.25);
@@ -1044,7 +1208,7 @@ function holdVal(r, sT){ return r.kind==='call' ? sT : r.K; }  // benchmark: hol
 function renderPayoff(r){
   $('payoffNote').textContent = r.kind==='call'
     ? `Value of 1 ${ST.asset} at expiry: subscribed (keeps premium, capped at strike) vs just holding.`
-    : `Value of $${fmt.d(r.K)} collateral at expiry: subscribed vs keeping the cash.`;
+    : `Value of $${fmt.px(r.K)} collateral at expiry: subscribed vs keeping the cash.`;
   if(r.prem==null){ $('payoffChart').innerHTML='<div class="empty">Enter a premium.</div>'; return; }
   const lo=r.a.spot*0.55, hi=Math.max(r.a.spot*1.55, r.K*1.25);
   const xs=[]; for(let i=0;i<=120;i++) xs.push(lo+(hi-lo)*i/120);
@@ -1052,15 +1216,15 @@ function renderPayoff(r){
   const be = r.kind==='call'? r.K+r.prem : r.K-r.prem;
   lineChart('payoffChart',{H:230,
     series:[{pts:hold,color:COL.hold,name:'hold'},{pts:strat,color:COL.iv,name:'strategy'}],
-    xTicks:niceTicks(lo,hi,4).map(v=>({x:v,label:'$'+fmt.d(v)})),
-    yFmt:v=>'$'+fmt.d(v),
+    xTicks:niceTicks(lo,hi,4).map(v=>({x:v,label:'$'+fmt.px(v)})),
+    yFmt:v=>'$'+fmt.px(v),
     vLines:[{x:r.a.spot,label:'spot'},{x:r.K,label:'strike'},{x:be,label:r.kind==='call'?'break-even vs hold':'net entry'}],
     tipAt:fx=>{
       const sv=payoffVal(r,fx), hv=holdVal(r,fx);
-      return {x:fx, html:`<div class="t">${ST.asset} at $${fmt.d(fx)} (${((fx/r.a.spot-1)*100).toFixed(0)}%)</div>`
-        +tipRow(COL.iv,'Subscribed','$'+fmt.d(sv))
-        +tipRow(COL.hold,'Doing nothing','$'+fmt.d(hv))
-        +`<div class="t">difference ${sv-hv>=0?'+':''}$${fmt.d(Math.abs(sv-hv))*((sv-hv)<0?-1:1)}</div>`};
+      return {x:fx, html:`<div class="t">${ST.asset} at $${fmt.px(fx)} (${((fx/r.a.spot-1)*100).toFixed(0)}%)</div>`
+        +tipRow(COL.iv,'Subscribed','$'+fmt.px(sv))
+        +tipRow(COL.hold,'Doing nothing','$'+fmt.px(hv))
+        +`<div class="t">difference ${sv-hv>=0?'+':'−'}$${fmt.px(Math.abs(sv-hv))}</div>`};
     }});
 }
 function renderScenarios(r){
@@ -1070,11 +1234,11 @@ function renderScenarios(r){
   const rows=moves.map(m=>{
     const sT=r.a.spot*(1+m/100), sv=payoffVal(r,sT)*scale, hv=holdVal(r,sT)*scale, d=sv-hv;
     let note;
-    if(r.kind==='call') note = sT>r.K ? `called away at $${fmt.d(r.K)} — premium kept, upside above forgone`
+    if(r.kind==='call') note = sT>r.K ? `called away at $${fmt.px(r.K)} — premium kept, upside above forgone`
       : `not exercised — ${ST.asset} kept + premium`;
-    else note = sT<r.K ? `assigned — buys ${ST.asset} at $${fmt.d(r.K)} (net $${fmt.d(r.K-r.prem)})`
+    else note = sT<r.K ? `assigned — buys ${ST.asset} at $${fmt.px(r.K)} (net $${fmt.px(r.K-r.prem)})`
       : `not exercised — cash kept + premium`;
-    return `<tr><td class="r num">${m>0?'+':''}${m}% · $${fmt.d(sT)}</td>
+    return `<tr><td class="r num">${m>0?'+':''}${m}% · $${fmt.px(sT)}</td>
       <td class="r num">${fmt.usd(sv)}</td><td class="r num">${fmt.usd(hv)}</td>
       <td class="r num" style="color:${d>=0?'var(--good)':'var(--bad)'}">${d>=0?'+':'−'}${fmt.usd(Math.abs(d))}</td>
       <td style="color:var(--muted)">${note}</td></tr>`;
@@ -1111,53 +1275,76 @@ function renderCompare(){
     const T=days/365, K=q.strikeUSD, kind=q.struct==='cc'?'call':'put';
     // rebuild market context for the quote's own asset
     const saved=ST.asset; ST.asset=q.asset;
+    const listed=isListed(a);
     const F=fwdAt(days), mark=surfaceIV(K,days,'miv'), bid=surfaceIV(K,days,'biv');
+    const fair = listed? null : fairVolFor(Q.win, days);
     ST.asset=saved;
     const base=q.struct==='cc'? a.spot : K;
     const prem=q.premUSD;                      // absolute USD per unit as saved
     const qiv=impliedVol(prem,F,K,T,kind); const r30v=a.realised['30']?a.realised['30'].vol:null;
-    const eBid=(qiv!=null&&bid)? qiv*100-bid.iv:null;
-    let v;
-    if(qiv==null) v={cls:'na',label:'n/a'};
-    else if(th.block!==false && r30v!=null && qiv*100<r30v) v={cls:'bad',label:'below realised'};
-    else if(eBid!=null&&eBid>=th.rich) v={cls:'good',label:'attractive'};
-    else if(eBid!=null&&eBid>=0) v={cls:'warn',label:'fair'};
-    else v={cls:'bad',label:'below listed'};
-    return {q,days,qiv:qiv!=null?qiv*100:null,mark:mark?mark.iv:null,bid:bid?bid.iv:null,eBid,
-      ann:prem/base/T*100, p:mark?probITM(F,K,T,mark.iv/100,kind):null, v};
+    let v, eBid;
+    if(listed){
+      eBid=(qiv!=null&&bid)? qiv*100-bid.iv:null;
+      if(qiv==null) v={cls:'na',label:'n/a'};
+      else if(th.block!==false && r30v!=null && qiv*100<r30v) v={cls:'bad',label:'below realised'};
+      else if(eBid!=null&&eBid>=th.rich) v={cls:'good',label:'attractive'};
+      else if(eBid!=null&&eBid>=0) v={cls:'warn',label:'fair'};
+      else v={cls:'bad',label:'below listed'};
+    } else {
+      const rich=D.meta.thresholds.fair_rich_pts??10;
+      eBid=(qiv!=null&&fair)? qiv*100-fair.vol:null;
+      if(eBid==null) v={cls:'na',label:'n/a'};
+      else if(eBid<0) v={cls:'bad',label:'below fair'};
+      else if(eBid<rich) v={cls:'warn',label:'fair'};
+      else v={cls:'good',label:'above fair'};
+    }
+    const pv = listed? (mark?mark.iv:null) : (fair?fair.vol:null);
+    return {q,days,listed,fair,qiv:qiv!=null?qiv*100:null,mark:mark?mark.iv:null,bid:bid?bid.iv:null,eBid,
+      ann:prem/base/T*100, p:pv!=null?probITM(F,K,T,pv/100,kind):null, v};
   });
   evald.sort((x,y)=>((y.eBid??-99)-(x.eBid??-99)));
   const rows=evald.map((e,i)=>{
     const q=e.q;
     if(e.expired||!e.days) return `<tr style="opacity:.55"><td>${esc(q.provider)}</td><td>${q.asset} ${q.struct==='cc'?'covered call':'cash-sec. put'}</td>
-      <td class="r num">$${fmt.d(q.strikeUSD)}</td><td class="r num">${esc(q.expiry)}</td><td colspan="5" style="color:var(--muted-2)">expired — remove when settled</td>
+      <td class="r num">$${fmt.px(q.strikeUSD)}</td><td class="r num">${esc(q.expiry)}</td><td colspan="5" style="color:var(--muted-2)">expired — remove when settled</td>
       <td><button class="rm" data-id="${q.id}" title="remove">✕</button></td></tr>`;
+    const goodAt = e.listed? (D.meta.thresholds.rich_pts??3) : (D.meta.thresholds.fair_rich_pts??10);
+    const bench = e.listed
+      ? `${e.bid!=null?e.bid.toFixed(1):'—'} / ${e.mark!=null?e.mark.toFixed(1):'—'}%`
+      : `fair ${e.fair?e.fair.vol.toFixed(1)+'%':'—'} <span style="color:var(--muted-2)">(${e.fair?esc(e.fair.label):''})</span>`;
     return `<tr><td>${esc(q.provider)}</td><td>${q.asset} ${q.struct==='cc'?'covered call':'cash-sec. put'}</td>
-      <td class="r num">$${fmt.d(q.strikeUSD)}</td>
+      <td class="r num">$${fmt.px(q.strikeUSD)}</td>
       <td class="r num">${esc(q.expiry)} <span style="color:var(--muted-2)">(${Math.round(e.days)}d)</span></td>
       <td class="r num">${e.qiv!=null?e.qiv.toFixed(1)+'%':'—'}</td>
-      <td class="r num">${e.bid!=null?e.bid.toFixed(1):'—'} / ${e.mark!=null?e.mark.toFixed(1):'—'}%</td>
-      <td class="r num" style="color:${e.eBid==null?'inherit':e.eBid>=3?'var(--good)':e.eBid>=0?'var(--warn)':'var(--bad)'}">${e.eBid!=null?fmt.pts(e.eBid):'—'}</td>
+      <td class="r num">${bench}</td>
+      <td class="r num" style="color:${e.eBid==null?'inherit':e.eBid>=goodAt?'var(--good)':e.eBid>=0?'var(--warn)':'var(--bad)'}">${e.eBid!=null?fmt.pts(e.eBid):'—'}</td>
       <td class="r num">${e.ann.toFixed(1)}%</td>
       <td class="r num">${e.p!=null?(e.p*100).toFixed(0)+'%':'—'}</td>
       <td><span class="verdict-chip ${e.v.cls}">${e.v.label}</span> <button class="rm" data-id="${q.id}" title="remove">✕</button></td></tr>`;
   }).join('');
   $('cmpTbl').innerHTML=`<table><tr><th>Provider</th><th>Structure</th><th class="r">Strike</th><th class="r">Expiry</th>
-    <th class="r">Quote IV</th><th class="r">Listed bid/mark</th><th class="r">Edge vs bid</th><th class="r">Ann. yield</th>
+    <th class="r">Quote IV</th><th class="r">Benchmark: listed bid/mark, or fair</th><th class="r">Edge</th><th class="r">Ann. yield</th>
     <th class="r">P(exercised)</th><th>Verdict</th></tr>${rows}</table>`;
   $('cmpTbl').querySelectorAll('.rm').forEach(b=>b.addEventListener('click',()=>{
     saveQuotes(loadQuotes().filter(x=>x.id!==b.dataset.id)); renderCompare();
   }));
 }
 function renderBaseline(){
-  const a=M(), struct=ST.base, kind=struct==='cc'?'call':'put';
-  const tenors=[14,30,60,90,120,180].filter(t=>t<=a.expiries[a.expiries.length-1]?.days+30);
+  const a=M(), struct=ST.base, kind=struct==='cc'?'call':'put', listed=isListed(a);
+  $('baseTitle').textContent = listed? 'Listed baseline — annualised premium a seller earns today'
+    : `Fair baseline — annualised premium ${ST.asset}'s own volatility justifies`;
+  $('baseNote').innerHTML = listed
+    ? 'From listed <b>bid</b> quotes (the side we could actually sell at), interpolated across the surface. Darker = richer. A provider must beat the matching cell after costs.'
+    : `No listed market exists, so each cell is priced at the volatility ${esc(ST.asset)} actually showed over the window matching its tenor. An offer below the matching cell is below fair.`;
+  const lastListed = a.expiries.length? a.expiries[a.expiries.length-1].days+30 : Infinity;
+  const tenors=[14,30,60,90,120,180].filter(t=>t<=lastListed);
   const monies = struct==='cc' ? [1.05,1.10,1.15,1.20,1.30] : [0.95,0.90,0.85,0.80,0.70];
   const cells=[]; let vmax=0;
   for(const t of tenors){
     const row=[];
     for(const m of monies){
-      const K=a.spot*m, r=surfaceIV(K,t,'biv');
+      const K=a.spot*m;
+      const r = listed? surfaceIV(K,t,'biv') : (()=>{ const f=fairVolFor('match', t); return f? {iv:f.vol, flags:[]} : null; })();
       if(!r){ row.push(null); continue; }
       const F=fwdAt(t), T=t/365, px=black76(F,K,T,r.iv/100,kind);
       const base=struct==='cc'?a.spot:K;
@@ -1166,14 +1353,16 @@ function renderBaseline(){
     }
     cells.push(row);
   }
-  const head = monies.map(m=>`<th class="r">${Math.round(m*100)}%<div style="font-weight:400;color:var(--dim)">$${fmt.d(a.spot*m)}</div></th>`).join('');
+  const head = monies.map(m=>`<th class="r">${Math.round(m*100)}%<div style="font-weight:400;color:var(--dim)">$${fmt.px(a.spot*m)}</div></th>`).join('');
   const body = tenors.map((t,i)=>`<tr><td class="num">${t}d</td>`+cells[i].map(c=>{
     if(!c) return '<td>—</td>';
     const al=Math.min(c.y/vmax,1)*0.55;
-    return `<td style="background:rgba(14,132,98,${al.toFixed(2)})"><span class="num" style="font-weight:600">${c.y.toFixed(1)}%</span>${c.est?'<span style="color:var(--muted-2)">*</span>':''}<div style="font-size:10px;color:var(--muted)">${c.iv.toFixed(0)}% IV</div></td>`;
+    return `<td style="background:rgba(14,132,98,${al.toFixed(2)})"><span class="num" style="font-weight:600">${c.y.toFixed(1)}%</span>${c.est?'<span style="color:var(--muted-2)">*</span>':''}<div style="font-size:10px;color:var(--muted)">${c.iv.toFixed(0)}% ${listed?'IV':'fair vol'}</div></td>`;
   }).join('')+'</tr>').join('');
   $('baseGrid').innerHTML=`<table class="heat"><tr><th>Tenor \\ strike (% of spot)</th>${head}</tr>${body}</table>
-    <div class="note" style="margin-top:8px">Annualised premium on the ${struct==='cc'?'asset':'cash collateral'} if sold at the listed bid today. * = few live bids, level estimated from marks.</div>`;
+    <div class="note" style="margin-top:8px">${listed
+      ? `Annualised premium on the ${struct==='cc'?'asset':'cash collateral'} if sold at the listed bid today. * = few live bids, level estimated from marks.`
+      : `Annualised premium on the ${struct==='cc'?'asset':'cash collateral'} at fair (realised) volatility. One volatility per tenor: lower-strike puts normally deserve extra.`}</div>`;
 }
 
 /* ================= analysis-date control ================= */
@@ -1191,11 +1380,16 @@ function renderDateCtl(){
   $('pastPill').innerHTML = latest? '' :
     `<span class="pastpill">Volatility state as of ${fmtDate(effDate())}<button id="backLatest">back to latest</button></span>`;
   const bl=$('backLatest'); if(bl) bl.addEventListener('click',()=>setDate(null));
-  const note1=$('boardNote1'), note2=$('boardNote2');
-  note1.hidden = note2.hidden = latest;
-  if(!latest){
+  const note1=$('boardNote1'), note2=$('boardNote2'), listed=isListed();
+  note1.hidden = latest || !listed;
+  note2.hidden = latest && listed;
+  if(!latest && listed){
     note1.textContent=`⚠ Listed option quotes cannot be rewound — this card shows the live board from ${D.generated_utc}.`;
     note2.textContent=`⚠ You are viewing the vol state of ${fmtDate(effDate())}, but the checker always prices against the live listed board (${D.generated_utc}) — a subscription decision is made at today's prices.`;
+  }
+  if(!listed){
+    note2.textContent=`${ST.asset} has no listed options, so offers are compared with a fair price built from ${ST.asset}'s own past volatility, over the window you choose below`
+      +(latest? '.' : `. The checker uses the latest data (${D.generated_utc}), not the rewound date.`);
   }
 }
 function buildDatePop(){
@@ -1235,8 +1429,8 @@ function segButtons(id, opts, cur, fn){
 }
 function renderAll(){ renderKPIs(); renderHist(); renderCone(); renderTerm(); renderBaseline(); syncForm(); renderQuote(); renderCompare(); }
 function syncForm(){
-  const a=M();
-  $('qStrike').value = Q.strikeMode==='pct'? Q.strike : Math.round(qStrikeUSD());
+  const a=M(), listed=isListed(a);
+  $('qStrike').value = Q.strikeMode==='pct'? Q.strike : roundPx(qStrikeUSD());
   $('qStrikeMode').value=Q.strikeMode;
   $('qExpiry').value=Q.expiry||'';
   $('qPrem').value=Q.prem; $('qPremConv').value=Q.conv; $('qNotional').value=Q.notional;
@@ -1244,20 +1438,38 @@ function syncForm(){
   const chips = Q.struct==='cc'? [100,105,110,120,130] : [95,90,85,80,70];
   const sc=$('strikeChips'); sc.innerHTML='';
   chips.forEach(p=>{ const c=document.createElement('button'); c.className='chip';
-    c.textContent=p+'% · $'+fmt.d(a.spot*p/100);
+    c.textContent=p+'% · $'+fmt.px(a.spot*p/100);
     c.addEventListener('click',()=>{ Q.strikeMode='pct'; Q.strike=p; syncForm(); renderQuote(); });
     sc.appendChild(c); });
+  // expiry chips: listed expiries, or standard tenors when nothing is listed
   const ec=$('expiryChips'); ec.innerHTML='';
-  a.expiries.filter(e=>e.days>=7).slice(0,6).forEach(e=>{
-    const c=document.createElement('button'); c.className='chip'; c.textContent=Math.round(e.days)+'d · '+e.date.slice(5);
+  const expChips = listed
+    ? a.expiries.filter(e=>e.days>=7).slice(0,6).map(e=>({date:e.date, label:Math.round(e.days)+'d · '+e.date.slice(5)}))
+    : [7,14,30,60,90].map(d=>({date:snapDatePlus(d), label:d+'d · '+snapDatePlus(d).slice(5)}));
+  expChips.forEach(e=>{
+    const c=document.createElement('button'); c.className='chip'; c.textContent=e.label;
     c.addEventListener('click',()=>{ Q.expiry=e.date; syncForm(); renderQuote(); });
     ec.appendChild(c); });
+  // fair-value window (assets without listed options only)
+  $('winField').hidden = listed;
+  if(!listed){
+    const days=qDays()||30, sel=$('qWin'); sel.innerHTML='';
+    const m=fairVolFor('match', days);
+    const opts=[{v:'match', l:`Match the option's tenor (recommended)${m?' — '+m.label+', '+m.vol.toFixed(1)+'%':''}`},
+      ...FAIR_WINDOWS.map(w=>{ const f=fairVolFor(String(w), days); return {v:String(w), l:`Last ${w} days${f?' — '+f.vol.toFixed(1)+'%':''}`}; }),
+      (()=>{ const f=fairVolFor('typical', days); return {v:'typical', l:`2-year typical${f?' — '+f.vol.toFixed(1)+'%':''}`}; })()];
+    for(const o of opts){ const op=document.createElement('option'); op.value=o.v; op.textContent=o.l; sel.appendChild(op); }
+    sel.value=Q.win;
+  }
 }
 function init(){
   $('asof').innerHTML=`data as of <b>${D.generated_utc}</b><br>refresh: <span class="num">python refresh.py</span>`;
   const ageD=(Date.now()-D.generated_ts)/86400000;
   if(ageD>1.2) $('staleWarn').innerHTML=`<div class="stale">⚠ This snapshot is ${ageD.toFixed(1)} days old — listed quotes and verdicts move with the market. Run <b>python refresh.py</b> for current data.</div>`;
-  segButtons('assetSeg', Object.keys(D.assets).map(a=>({v:a,label:a})), ST.asset, v=>{ ST.asset=v; qDefaults(); renderDateCtl(); renderAll(); });
+  segButtons('assetSeg', Object.keys(D.assets).map(a=>({v:a,label:a})), ST.asset, v=>{
+    ST.asset=v;
+    if(Q.strikeMode==='abs'){ Q.strikeMode='pct'; Q.strike = Q.struct==='cc'?110:90; }  // a USD strike never carries across assets
+    qDefaults(); renderDateCtl(); renderAll(); });
   $('dateBtn').addEventListener('click',e=>{ e.stopPropagation();
     const p=$('datePop'); if(p.hidden){ buildDatePop(); p.hidden=false; } else p.hidden=true; });
   document.addEventListener('click',e=>{ const p=$('datePop'); if(!p.hidden && !p.contains(e.target)) p.hidden=true; });
@@ -1278,9 +1490,10 @@ function init(){
   $('qStrike').addEventListener('input',()=>{ Q.strike=+$('qStrike').value; renderQuote(); });
   $('qStrikeMode').addEventListener('change',()=>{
     const K=qStrikeUSD(); Q.strikeMode=$('qStrikeMode').value;
-    Q.strike = Q.strikeMode==='pct'? +(K/M().spot*100).toFixed(1) : Math.round(K);
+    Q.strike = Q.strikeMode==='pct'? +(K/M().spot*100).toFixed(1) : roundPx(K);
     syncForm(); renderQuote(); });
-  $('qExpiry').addEventListener('change',()=>{ Q.expiry=$('qExpiry').value; renderQuote(); });
+  $('qExpiry').addEventListener('change',()=>{ Q.expiry=$('qExpiry').value; syncForm(); renderQuote(); });
+  $('qWin').addEventListener('change',()=>{ Q.win=$('qWin').value; renderQuote(); renderCompare(); });
   $('qPrem').addEventListener('input',()=>{ Q.prem=+$('qPrem').value; renderQuote(); });
   $('qPremConv').addEventListener('change',()=>{ Q.conv=$('qPremConv').value; renderQuote(); });
   $('qNotional').addEventListener('input',()=>{ Q.notional=+$('qNotional').value; renderQuote(); });
@@ -1288,7 +1501,7 @@ function init(){
     const r=evalQuote(); if(!r||r.prem==null) return;
     const qs=loadQuotes();
     qs.push({id:String(Date.now()), saved:D.generated_utc, provider:Q.provider||'Provider', asset:ST.asset,
-      struct:Q.struct, strikeUSD:Math.round(qStrikeUSD()*100)/100, expiry:Q.expiry, premUSD:r.prem});
+      struct:Q.struct, strikeUSD:roundPx(qStrikeUSD()), expiry:Q.expiry, premUSD:r.prem});
     saveQuotes(qs); renderCompare();
     $('compare').scrollIntoView({behavior:'smooth'});
   });

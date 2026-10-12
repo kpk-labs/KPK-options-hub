@@ -28,7 +28,7 @@ pricing of provider quotes.
    30-day realised vs implied (the seller's margin), the DVOL percentile over
    the past year, a 2-year volatility cone, the full ATM term structure, and a
    one-paragraph regime verdict. An **analysis date** picker rewinds all of it
-   to any day in the stored 2-year history, for both assets, so the vol state
+   to any day in the stored 2-year history, for every asset, so the vol state
    behind any past decision can be revisited.
 2. **Is this specific provider quote good?**
    Enter a quote in any convention a provider uses: upfront % of notional, APR
@@ -56,6 +56,29 @@ Tested in order; the first hit decides.
 Sellers are always benchmarked against the listed **bid**, never the mark:
 the mid is where nobody trades.
 
+## Assets without listed options (COW)
+
+COW has no listed options on any venue (Deribit, Binance, OKX, Bybit, Derive;
+checked October 2026), so there is no market price to compare an offer with.
+For COW the hub builds a **fair price from COW's own realised volatility**
+instead. The user picks the lookback window in the checker (match the
+option's tenor, the last 7 to 180 days, or the 2-year typical level), and the
+same option is priced at that volatility with the same engine.
+
+| Test | Verdict |
+|------|---------|
+| Quote IV below the window's realised vol | **Below fair.** The buyer pays for less movement than COW delivers |
+| Within 10 vol pts above it | **Fair** |
+| More than 10 vol pts above it | **Above fair** |
+
+A fair-price ladder shows the same offer against every window at once, so a
+reader can see whether the conclusion depends on which period they trust.
+Limits, stated on the page: the past does not guarantee the future, and one
+volatility is used for every strike, while puts far below spot normally
+deserve extra (skew), so fair is a floor. COW short windows use hourly bars,
+not 5-minute: COW is thinly traded and 5-minute returns are dominated by
+bid-ask noise.
+
 ## Accuracy
 
 ![One pricing engine, checked three ways: mathematical identities, published research anchors, and a live cross-check against Deribit's marks](docs/engine-validation.svg)
@@ -82,6 +105,7 @@ Pricing accuracy is a tested property, not an intention:
 | Option board, mark IVs, forwards | [Deribit public API](https://docs.deribit.com/) | none |
 | DVOL history, 2 years | Deribit public API | none |
 | Daily closes (2y), 5-minute bars (30d) | [Binance public API](https://developers.binance.com/docs/binance-spot-api-docs/rest-api) (Deribit perp fallback) | none |
+| COW spot, daily closes (since Nov 2024), hourly bars (30d) | Binance public API | none |
 
 Realised vol short windows (7/14/30d) use 5-minute bars; long windows, the
 cone and past analysis dates use daily closes. Saved provider quotes live in
