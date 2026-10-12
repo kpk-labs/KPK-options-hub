@@ -240,13 +240,15 @@ def binance_klines(symbol: str, interval: str, start_ms: int | None = None,
     return get("https://api.binance.com/api/v3/klines", p)
 
 
-def fetch_daily_closes(symbol: str, days: int, deribit_ccy: str):
+def fetch_daily_closes(symbol: str, days: int, deribit_ccy: str | None):
     """[[iso_date, close], ...] oldest first. Binance, Deribit perp fallback."""
     try:
         rows = binance_klines(symbol, "1d", limit=min(days, 1000))
         return [[datetime.fromtimestamp(r[0] / 1000, tz=timezone.utc)
                  .strftime("%Y-%m-%d"), float(r[4])] for r in rows]
     except Exception as e:                                # noqa: BLE001
+        if not deribit_ccy:
+            raise
         print(f"  Binance daily failed ({e}); falling back to Deribit perp")
         end = int(time.time())
         res = deribit("get_tradingview_chart_data",
@@ -259,13 +261,18 @@ def fetch_daily_closes(symbol: str, days: int, deribit_ccy: str):
                 for t, c in zip(res["ticks"], res["close"])]
 
 
-def fetch_5m_closes(symbol: str, days: int, deribit_ccy: str):
-    """Close series of 5m bars covering the last `days` days, oldest first."""
+BARS_PER_DAY = {"5m": 288, "1h": 24}
+DERIBIT_RESOLUTION = {"5m": "5", "1h": "60"}
+
+
+def fetch_intraday_closes(symbol: str, interval: str, days: int,
+                          deribit_ccy: str | None):
+    """Close series of intraday bars covering the last `days` days, oldest first."""
     try:
         out = []
         start = int((time.time() - days * 86400) * 1000)
         while True:
-            rows = binance_klines(symbol, "5m", start_ms=start)
+            rows = binance_klines(symbol, interval, start_ms=start)
             if not rows:
                 break
             out.extend(float(r[4]) for r in rows)
@@ -275,55 +282,75 @@ def fetch_5m_closes(symbol: str, days: int, deribit_ccy: str):
             time.sleep(0.15)
         return out
     except Exception as e:                                # noqa: BLE001
-        print(f"  Binance 5m failed ({e}); falling back to Deribit perp")
+        if not deribit_ccy:
+            raise
+        print(f"  Binance {interval} failed ({e}); falling back to Deribit perp")
         end = int(time.time())
         res = deribit("get_tradingview_chart_data",
                       {"instrument_name": f"{deribit_ccy}-PERPETUAL",
-                       "resolution": "5",
+                       "resolution": DERIBIT_RESOLUTION[interval],
                        "start_timestamp": (end - days * 86400) * 1000,
                        "end_timestamp": end * 1000})
         return [float(c) for c in res["close"]]
 
 
+def sig(x: float, n: int = 6) -> float:
+    """Round to n significant figures: keeps $0.1494 and $78,438 equally precise."""
+    if not x:
+        return x
+    return round(x, n - 1 - int(math.floor(math.log10(abs(x)))))
+
+
 # ---------------------------------------------------------------- assembly
 def build_asset(acfg: dict, cfg: dict, now: datetime) -> dict:
     sym = acfg["symbol"]
-    print(f"[{sym}] spot index ...")
-    spot = deribit("get_index_price",
-                   {"index_name": acfg["deribit_index"]})["index_price"]
+    listed = acfg.get("listed_options", True)
+    deribit_ccy = acfg.get("deribit_currency") if listed else None
+    interval = acfg.get("intraday_interval", "5m")
+    bpd = BARS_PER_DAY[interval]
 
-    print(f"[{sym}] option board ...")
-    expiries, med_err = fetch_board(acfg["deribit_currency"], spot,
-                                    cfg["universe"], now)
-    n_opt = sum(len(e["strikes"]) for e in expiries)
-    print(f"  {len(expiries)} expiries, {n_opt} strike rows, "
-          f"mark-IV reconstruction median error "
-          f"{med_err:.2f} vol pts" if med_err is not None else "  no IV check")
+    if listed:
+        print(f"[{sym}] spot index ...")
+        spot = deribit("get_index_price",
+                       {"index_name": acfg["deribit_index"]})["index_price"]
 
-    print(f"[{sym}] DVOL history ...")
-    dvol_hist = fetch_dvol(acfg["deribit_currency"],
-                           cfg["realised"]["history_days"])
-    dvol_now = dvol_hist[-1][1] if dvol_hist else None
-    dvol_1y = [c for d, c in dvol_hist[-365:]]
-    dvol_pct = (100.0 * sum(1 for c in dvol_1y if c <= dvol_now)
-                / len(dvol_1y)) if dvol_1y and dvol_now else None
+        print(f"[{sym}] option board ...")
+        expiries, med_err = fetch_board(deribit_ccy, spot, cfg["universe"], now)
+        n_opt = sum(len(e["strikes"]) for e in expiries)
+        print(f"  {len(expiries)} expiries, {n_opt} strike rows, "
+              f"mark-IV reconstruction median error "
+              f"{med_err:.2f} vol pts" if med_err is not None else "  no IV check")
+
+        print(f"[{sym}] DVOL history ...")
+        dvol_hist = fetch_dvol(deribit_ccy, cfg["realised"]["history_days"])
+        dvol_now = dvol_hist[-1][1] if dvol_hist else None
+        dvol_1y = [c for d, c in dvol_hist[-365:]]
+        dvol_pct = (100.0 * sum(1 for c in dvol_1y if c <= dvol_now)
+                    / len(dvol_1y)) if dvol_1y and dvol_now else None
+    else:
+        # no listed options anywhere: fair value comes from realised vol only
+        print(f"[{sym}] spot (Binance, no listed options) ...")
+        spot = float(get("https://api.binance.com/api/v3/ticker/price",
+                         {"symbol": acfg["binance_symbol"]})["price"])
+        expiries, med_err = [], None
+        dvol_hist, dvol_now, dvol_pct = [], None, None
 
     print(f"[{sym}] daily history ...")
     daily = fetch_daily_closes(acfg["binance_symbol"],
-                               cfg["realised"]["history_days"],
-                               acfg["deribit_currency"])
+                               cfg["realised"]["history_days"], deribit_ccy)
     closes = [c for _d, c in daily]
 
-    print(f"[{sym}] 5m bars (last 30d) ...")
-    m5 = fetch_5m_closes(acfg["binance_symbol"], 30, acfg["deribit_currency"])
+    print(f"[{sym}] {interval} bars (last 30d) ...")
+    intraday = fetch_intraday_closes(acfg["binance_symbol"], interval, 30,
+                                     deribit_ccy)
 
-    # headline realised vols: short windows on 5m bars, long on daily closes
+    # headline realised vols: short windows on intraday bars, long on daily closes
     realised = {}
     for w in cfg["realised"]["intraday_windows"]:
-        seg = m5[-(w * 288 + 1):]
-        v = ann_vol(seg, 365 * 288)
+        seg = intraday[-(w * bpd + 1):]
+        v = ann_vol(seg, 365 * bpd)
         if v:
-            realised[str(w)] = {"vol": round(v * 100, 2), "src": "5m"}
+            realised[str(w)] = {"vol": round(v * 100, 2), "src": interval}
     for w in cfg["realised"]["daily_windows"]:
         v = ann_vol(closes[-(w + 1):], 365)
         if v and str(w) not in realised:
@@ -357,8 +384,10 @@ def build_asset(acfg: dict, cfg: dict, now: datetime) -> dict:
             rv30.append([daily[i - 1][0], round(v * 100, 2)])
 
     return {
-        "spot": round(spot, 2),
-        "spot_history": [[d, round(c, 2)] for d, c in daily],
+        "listed": listed,
+        "intraday": interval,
+        "spot": sig(spot),
+        "spot_history": [[d, sig(c)] for d, c in daily],
         "realised": realised,
         "cone": cone,
         "rv30_history": rv30,

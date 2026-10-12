@@ -19,6 +19,14 @@ assets:
     deribit_currency: BTC
     deribit_index: btc_usd
     binance_symbol: BTCUSDT
+  # No listed options exist for COW on any venue (Deribit, Binance, OKX, Bybit,
+  # Derive; checked Oct 2026). Fair value is built from COW's own realised
+  # volatility instead. Hourly bars, not 5-minute: COW is thinly traded and
+  # 5-minute returns are dominated by bid-ask noise (24% of 5m bars unchanged).
+  - symbol: COW
+    binance_symbol: COWUSDT
+    listed_options: false
+    intraday_interval: 1h
 
 # Providers that quote structures to kpk. This only seeds the dropdown in the
 # quote checker; quotes themselves are entered on the page and live in the
@@ -55,3 +63,6 @@ thresholds:
   # Hard rule carried over from HANDOFF: never sell options below realised vol,
   # whatever the headline premium says.
   block_below_realised: true
+  # Assets without listed options: a quote this many vol points above the fair
+  # (realised) volatility of the chosen window reads as "above fair".
+  fair_rich_pts: 10.0
