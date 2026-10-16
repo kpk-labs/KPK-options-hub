@@ -15,7 +15,8 @@ Data sources (all public, no API key anywhere)
     Deribit  /public/get_index_price                spot index
     Deribit  /public/get_volatility_index_data      DVOL history
     Binance  /api/v3/klines                         daily + 5m price history
-             (falls back to Deribit PERPETUAL chart data if unreachable)
+             (data-api.binance.vision first, api.binance.com second; ETH/BTC
+              fall back to Deribit PERPETUAL chart data if both are unreachable)
 
 Accuracy notes
     - Bid/ask IVs are backed out locally with Black-76 on the per-expiry
@@ -113,6 +114,22 @@ def get(url: str, params: dict, tries: int = 3) -> dict | list:
             last = e
             time.sleep(1.5 * (i + 1))
     raise RuntimeError(f"GET {url} failed after {tries} tries: {last}")
+
+
+# api.binance.com answers HTTP 451 to US IPs, which includes GitHub-hosted
+# runners. data-api.binance.vision is Binance's public market-data mirror with
+# the same /api/v3 endpoints and no geo-block; keep .com as a fallback.
+BINANCE_HOSTS = ("https://data-api.binance.vision", "https://api.binance.com")
+
+
+def binance(path: str, params: dict):
+    last = None
+    for host in BINANCE_HOSTS:
+        try:
+            return get(f"{host}/api/v3/{path}", params)
+        except Exception as e:                            # noqa: BLE001
+            last = e
+    raise last
 
 
 def deribit(method: str, params: dict):
@@ -237,7 +254,7 @@ def binance_klines(symbol: str, interval: str, start_ms: int | None = None,
     p = {"symbol": symbol, "interval": interval, "limit": limit}
     if start_ms:
         p["startTime"] = start_ms
-    return get("https://api.binance.com/api/v3/klines", p)
+    return binance("klines", p)
 
 
 def fetch_daily_closes(symbol: str, days: int, deribit_ccy: str | None):
@@ -330,8 +347,8 @@ def build_asset(acfg: dict, cfg: dict, now: datetime) -> dict:
     else:
         # no listed options anywhere: fair value comes from realised vol only
         print(f"[{sym}] spot (Binance, no listed options) ...")
-        spot = float(get("https://api.binance.com/api/v3/ticker/price",
-                         {"symbol": acfg["binance_symbol"]})["price"])
+        spot = float(binance("ticker/price",
+                             {"symbol": acfg["binance_symbol"]})["price"])
         expiries, med_err = [], None
         dvol_hist, dvol_now, dvol_pct = [], None, None
 
